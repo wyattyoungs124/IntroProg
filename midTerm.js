@@ -25,6 +25,7 @@ let curUser;
 let users = [];
 let userMap = new Map();
 let keepRunning = 1;
+let failedLogins = 0;
 
 const CHECKING_BALANCE = 1000;
 const SAVINGS_BALANCE = 1000;
@@ -45,6 +46,10 @@ class User{
         this.pin = pin;
     }
 
+    depositSavings(amount){
+        this.savings += amount;
+    }
+
     depositChecking(amount) {
         this.checkings += amount;
     }
@@ -58,7 +63,11 @@ class User{
     }
 
     withdrawSavings(amount) {
-
+        if(amount > this.savings){
+            throw "Error: Too much withdrawn!";
+        }
+        this.savings -= amount;
+        return this.savings;
     }
 
     login(firstName, lastName, pin) {
@@ -71,6 +80,10 @@ class User{
         outtext += `Checkings: $${curUser.checkings} Savings: $${curUser.savings}\n`;
         outtext += `Your Wallet: $${myWallet}`;
         return outtext;
+    }
+
+    get name() {
+        return `${this.firstName} ${this.lastName}`;
     }
 
 }
@@ -99,10 +112,17 @@ function loadUsers() {
 }
 
 function login(){
+    if (failedLogins>=3){
+        keepRunning = 0;
+        console.log("Too many attempts terminal shutting down. ");
+        return;
+    }
     let id = REF.inputNumber("Enter your ID:  ");
     if (!userMap.has(id)){
         console.log("Account not found!");
+        failedLogins++;
         return login();
+
     }
     let account = userMap.get(id);
     let first   = REF.inputString("Enter First Name:  ");
@@ -113,14 +133,46 @@ function login(){
     }
     else {
         console.log("Account not found!");
+        failedLogins++;
         return login();
     }
 }
 
 function doWithdraw() {
     let CashAmount = REF.inputPosNumber("Enter amount to withdraw:  ");
+    let accName;
     try {
-        switch(REF.inputNumber("1 for Checkings, 2 for Savings")) {
+        switch(REF.inputNumber("1 for Checkings, 2 for Savings: ")) {
+            case 1:
+                curUser.withdrawCheckings(CashAmount);
+                accName = "Checkings";
+                break;
+            case 2:
+                curUser.withdrawSavings(CashAmount);
+                accName = "Savings";
+                break;
+            default:
+                console.log("Invalid choice! Please try again.");
+                return;
+        }
+    }
+    catch(err) {
+        console.log(err);
+    }
+    myWallet += CashAmount;
+    console.log(`You have withdrawn $${CashAmount} from your ${accName} account.`);
+}
+
+function doTrans() {
+    let id = REF.inputNumber("Enter destination ID:  ");
+    if (!userMap.has(id)){
+        console.log("Account not found!");
+        return;
+    }
+    let account = userMap.get(id);
+    let CashAmount = REF.inputPosNumber("Enter amount you're transferring:  ");
+    try {
+        switch(REF.inputNumber("1 for Checkings, 2 for Savings (Source): ")) {
             case 1:
                 curUser.withdrawCheckings(CashAmount);
                 break;
@@ -134,17 +186,64 @@ function doWithdraw() {
     }
     catch(err) {
         console.log(err);
+        return;
     }
-    myWallet += CashAmount;
 
-}
+    try {
+        let incompleteTrans = 1; // While loop prevents returning here from leaving funds withdrawn but not deposited.
+        while(incompleteTrans) {
+            switch (REF.inputNumber("1 for Checkings, 2 for Savings (Destination): ")) {
+                case 1:
+                    account.depositChecking(CashAmount);
+                    incompleteTrans = 0;
+                    break;
+                case 2:
+                    account.depositSavings(CashAmount);
+                    incompleteTrans = 0;
+                    break;
+                default:
+                    console.log("Invalid choice! Please try again.");
+                    break;
+            }
+        }
+    }
+    catch(err) {
+        console.log(err);
+        return;
+    }
 
-function doTrans() {
-    console.log("Did transfer!");
+    console.log(`You have transferred $${CashAmount} to ${account.name}`);
 }
 
 function doDeposit() {
-    console.log("Did deposit!");
+    let CashAmount = REF.inputPosNumber("Enter amount you're depositing:  ");
+    if(CashAmount > myWallet) {
+        console.log("Not enough money to deposit!");
+        return;
+    }
+
+    try {
+        let accName;
+        switch(REF.inputNumber("1 for Checkings, 2 for Savings: ")) {
+            case 1:
+                curUser.depositChecking(CashAmount);
+                accName = 'Checking';
+                break;
+            case 2:
+                curUser.depositSavings(CashAmount);
+                accName = 'Savings';
+                break;
+            default:
+                console.log("Invalid choice! Please try again.");
+                return;
+        }
+    }
+    catch(err) {
+        console.log(err);
+        return;
+    }
+    myWallet -= CashAmount;
+    console.log(`You have deposited ${CashAmount} from your ${accName}. `);
 }
 
 function doInquire() {
