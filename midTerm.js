@@ -26,6 +26,7 @@ let users = [];
 let userMap = new Map();
 let keepRunning = 1;
 let failedLogins = 0;
+let attemptsLimit = 3;
 
 const CHECKING_BALANCE = 1000;
 const SAVINGS_BALANCE = 1000;
@@ -112,7 +113,7 @@ function loadUsers() {
 }
 
 function login(){
-    if (failedLogins>=3){
+    if (failedLogins>=attemptsLimit){
         keepRunning = 0;
         console.log("Too many attempts terminal shutting down. ");
         return;
